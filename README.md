@@ -1,2 +1,1 @@
-# go-distributed-file-system
-Distributed File System in Go
+## Distributed File System in Go
