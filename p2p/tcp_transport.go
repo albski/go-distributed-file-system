@@ -73,11 +73,13 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 		return
 	}
 
-	msg := struct{}{} // placeholder
+	msg := &Message{}
 	for {
 		if err := t.Decoder.Decode(conn, msg); err != nil {
-			fmt.Printf("TCP error: %s\n", err)
+			fmt.Printf("TCP error: %s", err)
 			continue
 		}
+
+		fmt.Printf("message: %v", msg)
 	}
 }
