@@ -3,16 +3,13 @@ package p2p
 import (
 	"fmt"
 	"net"
-	"sync"
 )
 
-// remote node of a TCP established conn
 type TCPPeer struct {
-	// conn is the underlying connection of the peer
 	conn net.Conn
 
-	// if we dial and retrieve a conn => outbound = true
-	// if we accept and retrieve a conn => outbound = false
+	// dial and retrieve => outbound = true
+	// accept and retrieve => outbound = false
 	outbound bool
 }
 
@@ -23,27 +20,28 @@ func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	}
 }
 
-type TCPTransport struct {
-	listenAddr    string
-	listener      net.Listener
-	handshakeFunc HandshakeFunc
-	decoder       Decoder
-
-	mu    sync.RWMutex
-	peers map[net.Addr]Peer
+type TCPTransportOpts struct {
+	ListenAddr    string
+	HandshakeFunc HandshakeFunc
+	Decoder       Decoder
 }
 
-func NewTCPTransport(listenAddr string) *TCPTransport {
-	return &TCPTransport{
-		handshakeFunc: NOPHandshakeFunc, // temporary
-		listenAddr:    listenAddr,
-	}
+type TCPTransport struct {
+	TCPTransportOpts
+	listener net.Listener
+
+	// mu    sync.RWMutex
+	// peers map[net.Addr]Peer
+}
+
+func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
+	return &TCPTransport{TCPTransportOpts: opts}
 }
 
 func (t *TCPTransport) ListenAndAccept() error {
-	l, err := net.Listen("tcp", t.listenAddr)
+	l, err := net.Listen("tcp", t.ListenAddr)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", t.listenAddr, err)
+		return fmt.Errorf("failed to listen on %s: %w", t.ListenAddr, err)
 	}
 
 	t.listener = l
@@ -68,7 +66,7 @@ func (t *TCPTransport) startAcceptLoop() {
 func (t *TCPTransport) handleConn(conn net.Conn) {
 	peer := NewTCPPeer(conn, false)
 
-	if err := t.handshakeFunc(peer); err != nil {
+	if err := t.HandshakeFunc(peer); err != nil {
 		conn.Close()
 
 		fmt.Printf("TCP handshake error: %s\n", err)
@@ -77,7 +75,7 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 
 	msg := struct{}{} // placeholder
 	for {
-		if err := t.decoder.Decode(conn, msg); err != nil {
+		if err := t.Decoder.Decode(conn, msg); err != nil {
 			fmt.Printf("TCP error: %s\n", err)
 			continue
 		}
