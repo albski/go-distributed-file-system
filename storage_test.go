@@ -2,19 +2,21 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"testing"
 )
 
 func TestCryptPathTransformFunc(t *testing.T) {
 	key := "randomKey"
-	path := CryptPathTransformFunc(key)
+	keyPath := CryptPathTransformFunc(key)
 
+	expectedKey := `1d7dbdcda1992ee24e7232d2fcbe8d49f28ca22c`
 	expectedPath := `1d7db/dcda1/992ee/24e72/32d2f/cbe8d/49f28/ca22c`
-	if path != expectedPath {
-		t.Errorf("have %s\nwant %s", path, expectedPath)
+	if keyPath.Key != expectedKey {
+		t.Errorf("have %s\nwant %s", keyPath.Key, expectedKey)
 	}
-	fmt.Println(path)
+	if keyPath.Path != expectedPath {
+		t.Errorf("have %s\nwant %s", keyPath.Path, expectedPath)
+	}
 }
 
 func TestStorage(t *testing.T) {

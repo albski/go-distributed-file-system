@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
 	"io"
@@ -9,17 +11,26 @@ import (
 	"path/filepath"
 )
 
-type PathTransformFunc func(string) string
-
 type StorageOpts struct {
 	PathTransformFunc PathTransformFunc
 }
 
-var DefualtPathTransformFunc = func(key string) string {
-	return key
+type Storage struct {
+	StorageOpts
 }
 
-func CryptPathTransformFunc(key string) string {
+func NewStorage(opts StorageOpts) *Storage {
+	return &Storage{StorageOpts: opts}
+}
+
+type KeyPath struct {
+	Key  string
+	Path string // Path is based on Key
+}
+
+type PathTransformFunc func(string) KeyPath
+
+func CryptPathTransformFunc(key string) KeyPath {
 	hash := sha1.Sum([]byte(key))
 	hashStr := hex.EncodeToString(hash[:])
 
@@ -32,34 +43,32 @@ func CryptPathTransformFunc(key string) string {
 		paths[i] = hashStr[from:to]
 	}
 
-	return filepath.Join(paths...)
-}
-
-type Storage struct {
-	StorageOpts
-}
-
-func NewStorage(opts StorageOpts) *Storage {
-	return &Storage{StorageOpts: opts}
+	return KeyPath{
+		Key:  hashStr,
+		Path: filepath.Join(paths...),
+	}
 }
 
 func (s *Storage) writeStream(key string, r io.Reader) error {
-	pathName := s.PathTransformFunc(key)
+	keyPath := s.PathTransformFunc(key)
 
-	// figure out sth better than ModePerm
-	if err := os.MkdirAll(pathName, os.ModePerm); err != nil {
-		return nil
+	// is ModePerm correct?
+	if err := os.MkdirAll(keyPath.Path, os.ModePerm); err != nil {
+		return err
 	}
 
-	fileName := "placeholder"
+	buf := new(bytes.Buffer)
+	io.Copy(buf, r)
+	fileNameBytes := md5.Sum(buf.Bytes())
+	fileName := hex.EncodeToString(fileNameBytes[:])
 
-	absPath := filepath.Join(pathName, fileName)
+	absPath := filepath.Join(keyPath.Path, fileName)
 	f, err := os.Create(absPath)
 	if err != nil {
 		return err
 	}
 
-	n, err := io.Copy(f, r)
+	n, err := io.Copy(f, buf)
 	if err != nil {
 		return err
 	}
