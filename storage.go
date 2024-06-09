@@ -12,7 +12,7 @@ import (
 )
 
 type StorageOpts struct {
-	PathTransformFunc PathTransformFunc
+	transformPathFunc transformPathFunc
 }
 
 type Storage struct {
@@ -28,9 +28,9 @@ type KeyPath struct {
 	Path string // Path is based on Key
 }
 
-type PathTransformFunc func(string) KeyPath
+type transformPathFunc func(string) KeyPath
 
-func CryptPathTransformFunc(key string) KeyPath {
+func transformPathCrypt(key string) KeyPath {
 	hash := sha1.Sum([]byte(key))
 	hashStr := hex.EncodeToString(hash[:])
 
@@ -50,9 +50,8 @@ func CryptPathTransformFunc(key string) KeyPath {
 }
 
 func (s *Storage) writeStream(key string, r io.Reader) error {
-	keyPath := s.PathTransformFunc(key)
+	keyPath := s.transformPathFunc(key)
 
-	// is ModePerm correct?
 	if err := os.MkdirAll(keyPath.Path, os.ModePerm); err != nil {
 		return err
 	}

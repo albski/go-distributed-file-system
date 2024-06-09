@@ -7,7 +7,7 @@ import (
 
 func TestCryptPathTransformFunc(t *testing.T) {
 	key := "randomKey"
-	keyPath := CryptPathTransformFunc(key)
+	keyPath := transformPathCrypt(key)
 
 	expectedKey := `1d7dbdcda1992ee24e7232d2fcbe8d49f28ca22c`
 	expectedPath := `1d7db/dcda1/992ee/24e72/32d2f/cbe8d/49f28/ca22c`
@@ -21,7 +21,7 @@ func TestCryptPathTransformFunc(t *testing.T) {
 
 func TestStorage(t *testing.T) {
 	opts := StorageOpts{
-		PathTransformFunc: CryptPathTransformFunc,
+		transformPathFunc: transformPathCrypt,
 	}
 
 	s := NewStorage(opts)
