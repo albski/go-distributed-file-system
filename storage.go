@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
 	"io"
@@ -26,6 +24,10 @@ func NewStorage(opts StorageOpts) *Storage {
 type KeyPath struct {
 	Key  string
 	Path string // Path is based on Key
+}
+
+func (k KeyPath) absolutePath() string {
+	return filepath.Join(k.Path, k.Key)
 }
 
 type transformPathFunc func(string) KeyPath
@@ -56,18 +58,14 @@ func (s *Storage) writeStream(key string, r io.Reader) error {
 		return err
 	}
 
-	buf := new(bytes.Buffer)
-	io.Copy(buf, r)
-	fileNameBytes := md5.Sum(buf.Bytes())
-	fileName := hex.EncodeToString(fileNameBytes[:])
+	absPath := keyPath.absolutePath()
 
-	absPath := filepath.Join(keyPath.Path, fileName)
 	f, err := os.Create(absPath)
 	if err != nil {
 		return err
 	}
 
-	n, err := io.Copy(f, buf)
+	n, err := io.Copy(f, r)
 	if err != nil {
 		return err
 	}
