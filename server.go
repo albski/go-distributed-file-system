@@ -46,6 +46,10 @@ func (fs *FileServer) loop() {
 }
 
 func (fs *FileServer) Start() error {
+	defer func() {
+		fs.transport.Close()
+	}()
+
 	if err := fs.transport.ListenAndAccept(); err != nil {
 		return err
 	}
