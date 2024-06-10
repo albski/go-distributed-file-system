@@ -1,13 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+const DefaultRootDir = ""
 
 type StorageOpts struct {
 	transformPathFunc transformPathFunc
@@ -26,8 +30,12 @@ type KeyPath struct {
 	Path string // Path is based on Key
 }
 
-func (k KeyPath) absolutePath() string {
+func (k KeyPath) fullPath() string {
 	return filepath.Join(k.Path, k.Key)
+}
+
+func (k KeyPath) rootPath() string {
+	return strings.Split(filepath.ToSlash(k.fullPath()), "/")[0]
 }
 
 type transformPathFunc func(string) KeyPath
@@ -51,6 +59,34 @@ func transformPathCrypt(key string) KeyPath {
 	}
 }
 
+func (s *Storage) Delete(key string) error {
+	keyPath := s.transformPathFunc(key)
+
+	defer func() {
+		log.Printf("deleted %s", keyPath.Key)
+	}()
+
+	return os.RemoveAll(keyPath.rootPath())
+}
+
+func (s *Storage) Read(key string) (io.Reader, error) {
+	f, err := s.readStream(key)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, f)
+
+	return buf, err
+}
+
+func (s *Storage) readStream(key string) (io.ReadCloser, error) {
+	keyPath := s.transformPathFunc(key)
+	return os.Open(keyPath.fullPath())
+}
+
 func (s *Storage) writeStream(key string, r io.Reader) error {
 	keyPath := s.transformPathFunc(key)
 
@@ -58,9 +94,9 @@ func (s *Storage) writeStream(key string, r io.Reader) error {
 		return err
 	}
 
-	absPath := keyPath.absolutePath()
+	fullPath := keyPath.fullPath()
 
-	f, err := os.Create(absPath)
+	f, err := os.Create(fullPath)
 	if err != nil {
 		return err
 	}
@@ -70,7 +106,7 @@ func (s *Storage) writeStream(key string, r io.Reader) error {
 		return err
 	}
 
-	log.Printf("written %d bytes to disk: %s", n, absPath)
+	log.Printf("written %d bytes to disk: %s", n, fullPath)
 
 	return nil
 }
