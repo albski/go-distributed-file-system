@@ -17,7 +17,7 @@ func TestCryptPathTransformFunc(t *testing.T) {
 	expectedPath := `1d7db/dcda1/992ee/24e72/32d2f/cbe8d/49f28/ca22c`
 
 	assert.Equal(t, keyPath.Key, expectedKey)
-	assert.Equal(t, keyPath.Key, expectedPath)
+	assert.Equal(t, keyPath.Path, expectedPath)
 }
 
 func TestStorageDeleteKey(t *testing.T) {

@@ -11,9 +11,10 @@ import (
 	"strings"
 )
 
-const DefaultRootDir = ""
+const defaultRootDir = "network"
 
 type StorageOpts struct {
+	rootDir           string
 	transformPathFunc transformPathFunc
 }
 
@@ -22,6 +23,10 @@ type Storage struct {
 }
 
 func NewStorage(opts StorageOpts) *Storage {
+	if opts.rootDir == "" {
+		opts.rootDir = defaultRootDir
+	}
+
 	return &Storage{StorageOpts: opts}
 }
 
@@ -30,12 +35,31 @@ type KeyPath struct {
 	Path string // Path is based on Key
 }
 
-func (k KeyPath) fullPath() string {
-	return filepath.Join(k.Path, k.Key)
+func (k KeyPath) dirPath(basePath string) string {
+	if basePath == "" {
+		return k.Path
+	}
+	basePath = filepath.Clean(basePath)
+	return filepath.Join(basePath, k.Path)
 }
 
-func (k KeyPath) rootPath() string {
-	return strings.Split(filepath.ToSlash(k.fullPath()), "/")[0]
+func (k KeyPath) fullPath(basePath string) string {
+	if basePath == "" {
+		return filepath.Join(k.Path, k.Key)
+	}
+
+	basePath = filepath.Clean(basePath)
+	return filepath.Join(basePath, k.Path, k.Key)
+}
+
+func (k KeyPath) rootPath(basePath string) string {
+	if basePath == "" {
+		return filepath.Join(k.Path, k.Key)
+	}
+
+	basePath = filepath.Clean(basePath)
+	rootPath := strings.Split(filepath.ToSlash(k.fullPath("")), "/")[0]
+	return filepath.Join(basePath, rootPath)
 }
 
 type transformPathFunc func(string) KeyPath
@@ -66,7 +90,7 @@ func (s *Storage) Delete(key string) error {
 		log.Printf("deleted %s", keyPath.Key)
 	}()
 
-	return os.RemoveAll(keyPath.rootPath())
+	return os.RemoveAll(keyPath.rootPath(s.rootDir))
 }
 
 func (s *Storage) Read(key string) (io.Reader, error) {
@@ -84,17 +108,17 @@ func (s *Storage) Read(key string) (io.Reader, error) {
 
 func (s *Storage) readStream(key string) (io.ReadCloser, error) {
 	keyPath := s.transformPathFunc(key)
-	return os.Open(keyPath.fullPath())
+	return os.Open(keyPath.fullPath(s.rootDir))
 }
 
 func (s *Storage) writeStream(key string, r io.Reader) error {
 	keyPath := s.transformPathFunc(key)
 
-	if err := os.MkdirAll(keyPath.Path, os.ModePerm); err != nil {
+	if err := os.MkdirAll(keyPath.dirPath(s.rootDir), os.ModePerm); err != nil {
 		return err
 	}
 
-	fullPath := keyPath.fullPath()
+	fullPath := keyPath.fullPath(s.rootDir)
 
 	f, err := os.Create(fullPath)
 	if err != nil {
