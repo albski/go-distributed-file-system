@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"log"
 	"os"
@@ -22,6 +23,14 @@ func NewStorage(opts StorageOpts) *Storage {
 	}
 
 	return &Storage{StorageOpts: opts}
+}
+
+func (s *Storage) Has(key string) bool {
+	keyPath := s.transformPathFunc(key)
+
+	_, err := os.Stat(keyPath.fullPath(s.rootDir))
+
+	return !errors.Is(err, os.ErrNotExist)
 }
 
 func (s *Storage) Delete(key string) error {
@@ -45,6 +54,10 @@ func (s *Storage) Read(key string) (io.Reader, error) {
 	_, err = io.Copy(buf, f)
 
 	return buf, err
+}
+
+func (s *Storage) Clear() error {
+	return os.RemoveAll(s.rootDir)
 }
 
 func (s *Storage) readStream(key string) (io.ReadCloser, error) {
