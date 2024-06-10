@@ -34,25 +34,8 @@ func TestStorage(t *testing.T) {
 	assert.Equal(t, string(b), string(data))
 
 	s.Delete(key)
-}
 
-func TestStorageDeleteKey(t *testing.T) {
-	opts := StorageOpts{
-		transformPathFunc: transformPathCrypt,
-	}
-
-	s := NewStorage(opts)
-
-	key := "random key"
-	data := []byte("some jpg data")
-
-	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
-		t.Error(err)
-	}
-
-	if err := s.Delete(key); err != nil {
-		t.Error(err)
-	}
+	assert.False(t, s.Has(key))
 }
 
 func TestCryptPathTransformFunc(t *testing.T) {

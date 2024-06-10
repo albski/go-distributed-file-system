@@ -50,6 +50,10 @@ func (t *TCPTransport) Consume() <-chan RPC {
 	return t.rpcChan
 }
 
+func (t *TCPTransport) Close() error {
+	return t.listener.Close()
+}
+
 func (t *TCPTransport) ListenAndAccept() error {
 	l, err := net.Listen("tcp", t.ListenAddr)
 	if err != nil {

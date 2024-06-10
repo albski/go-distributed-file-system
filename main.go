@@ -1,31 +1,36 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"time"
 
 	"github.com/albski/go-distributed-file-system/p2p"
 )
 
 func main() {
-	opts := p2p.TCPTransportOpts{
+	tcpTransportOpts := p2p.TCPTransportOpts{
 		ListenAddr:    ":3000",
 		HandshakeFunc: p2p.NOPHandshakeFunc,
 		Decoder:       p2p.DefaultDecoder{},
 	}
 
-	tr := p2p.NewTCPTransport(opts)
+	tcpTransport := p2p.NewTCPTransport(tcpTransportOpts)
+
+	fileServerOpts := FileServerOpts{
+		storageRoot:       "3000_network",
+		transformPathFunc: transformPathCrypt,
+		transport:         tcpTransport,
+	}
+
+	fs := NewFileServer(fileServerOpts)
 
 	go func() {
-		for {
-			msg := <-tr.Consume()
-			fmt.Printf("consumed: %v\n", msg)
-		}
+		time.Sleep(time.Second * 3)
+		fs.Stop()
 	}()
 
-	if err := tr.ListenAndAccept(); err != nil {
+	if err := fs.Start(); err != nil {
 		log.Fatal(err)
 	}
 
-	select {}
 }
