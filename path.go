@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-const defaultRootDir = "network" // make it env var later
+const defaultRootDir = "network"
 
 type KeyPath struct {
 	Key  string
