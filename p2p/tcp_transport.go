@@ -29,15 +29,13 @@ type TCPTransportOpts struct {
 	ListenAddr    string
 	HandshakeFunc HandshakeFunc
 	Decoder       Decoder
+	OnPeer        func(Peer) error
 }
 
 type TCPTransport struct {
 	TCPTransportOpts
 	listener net.Listener
 	rpcChan  chan RPC
-
-	// mu    sync.RWMutex
-	// peers map[net.Addr]Peer
 }
 
 func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
@@ -45,6 +43,17 @@ func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 		TCPTransportOpts: opts,
 		rpcChan:          make(chan RPC),
 	}
+}
+
+func (t *TCPTransport) Dial(addr string) error {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	go t.handleConn(conn, true)
+
+	return nil
 }
 
 func (t *TCPTransport) Consume() <-chan RPC {
@@ -81,11 +90,11 @@ func (t *TCPTransport) startAcceptLoop() {
 		}
 
 		fmt.Printf("incoming conn: %+v\n", conn.RemoteAddr())
-		go t.handleConn(conn)
+		go t.handleConn(conn, false)
 	}
 }
 
-func (t *TCPTransport) handleConn(conn net.Conn) {
+func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 	var err error
 
 	defer func() {
