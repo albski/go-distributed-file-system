@@ -1,8 +1,12 @@
 package p2p
 
+import "net"
+
 // remote node
 type Peer interface {
-	Close() error
+	net.Conn
+
+	Send([]byte) error
 }
 
 // anything that handles communication

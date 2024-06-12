@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"log"
 
 	"github.com/albski/go-distributed-file-system/p2p"
@@ -22,7 +23,11 @@ func makeServer(listenAddr string, nodes ...string) *FileServer {
 		bootstrapNodes:    nodes,
 	}
 
-	return NewFileServer(fileServerOpts)
+	fs := NewFileServer(fileServerOpts)
+
+	tcpTransport.OnPeer = fs.OnPeer
+
+	return fs
 }
 
 func main() {
@@ -36,10 +41,9 @@ func main() {
 		}
 	}()
 
-	go func() {
-		err := fs2.Start()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
+	fs2.Start()
+
+	data := bytes.NewReader([]byte("big data"))
+
+	fs2.StoreFile("key", data)
 }

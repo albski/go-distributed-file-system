@@ -7,7 +7,7 @@ import (
 )
 
 type TCPPeer struct {
-	conn net.Conn
+	net.Conn
 
 	// dial and retrieve => outbound = true
 	// accept and retrieve => outbound = false
@@ -16,13 +16,14 @@ type TCPPeer struct {
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
-		conn:     conn,
+		Conn:     conn,
 		outbound: outbound,
 	}
 }
 
-func (p *TCPPeer) Close() error {
-	return p.conn.Close()
+func (p *TCPPeer) Send(b []byte) error {
+	_, err := p.Conn.Write(b)
+	return err
 }
 
 type TCPTransportOpts struct {
