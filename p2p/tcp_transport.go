@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 )
 
 type TCPPeer struct {
@@ -12,12 +13,15 @@ type TCPPeer struct {
 	// dial and retrieve => outbound = true
 	// accept and retrieve => outbound = false
 	outbound bool
+
+	Wg *sync.WaitGroup
 }
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		Conn:     conn,
 		outbound: outbound,
+		Wg:       &sync.WaitGroup{},
 	}
 }
 
@@ -36,13 +40,13 @@ type TCPTransportOpts struct {
 type TCPTransport struct {
 	TCPTransportOpts
 	listener net.Listener
-	rpcChan  chan RPC
+	rpcCh    chan RPC
 }
 
 func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportOpts: opts,
-		rpcChan:          make(chan RPC),
+		rpcCh:            make(chan RPC),
 	}
 }
 
@@ -58,7 +62,7 @@ func (t *TCPTransport) Dial(addr string) error {
 }
 
 func (t *TCPTransport) Consume() <-chan RPC {
-	return t.rpcChan
+	return t.rpcCh
 }
 
 func (t *TCPTransport) Close() error {
@@ -66,12 +70,12 @@ func (t *TCPTransport) Close() error {
 }
 
 func (t *TCPTransport) ListenAndAccept() error {
-	l, err := net.Listen("tcp", t.ListenAddr)
+	var err error
+
+	t.listener, err = net.Listen("tcp", t.ListenAddr)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", t.ListenAddr, err)
 	}
-
-	t.listener = l
 
 	go t.startAcceptLoop()
 
@@ -81,7 +85,6 @@ func (t *TCPTransport) ListenAndAccept() error {
 func (t *TCPTransport) startAcceptLoop() {
 	for {
 		conn, err := t.listener.Accept()
-
 		if errors.Is(err, net.ErrClosed) {
 			return
 		}
@@ -118,7 +121,12 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 			return
 		}
 
-		rpc.From = conn.RemoteAddr()
-		t.rpcChan <- rpc
+		rpc.From = conn.RemoteAddr().String()
+		peer.Wg.Add(1)
+		fmt.Println("waiting thill stream is done")
+		t.rpcCh <- rpc
+
+		peer.Wg.Wait()
+		fmt.Println("stream done")
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -42,28 +43,20 @@ func NewFileServer(opts FileServerOpts) *FileServer {
 	}
 }
 
-type Payload struct {
-	Key  string
-	Data []byte
-}
-
-func (fs *FileServer) broadcast(p Payload) error {
-	peers := []io.Writer{}
-
-	for _, peer := range fs.peers {
-		peers = append(peers, peer)
+func (fs *FileServer) Start() error {
+	if err := fs.transport.ListenAndAccept(); err != nil {
+		return err
 	}
 
-	mw := io.MultiWriter(peers...)
+	fs.bootstrapNetwork()
 
-	return gob.NewEncoder(mw).Encode(p)
-}
-
-func (fs *FileServer) StoreData(key string, r io.Reader) error {
-	// 1. store to disk
-	// 2. broadcast to network
+	fs.loop()
 
 	return nil
+}
+
+func (fs *FileServer) Stop() {
+	close(fs.quitCh)
 }
 
 func (fs *FileServer) OnPeer(p p2p.Peer) error {
@@ -74,19 +67,6 @@ func (fs *FileServer) OnPeer(p p2p.Peer) error {
 
 	log.Printf("connected with remote %s", p.RemoteAddr())
 	return nil
-}
-
-func (fs *FileServer) loop() {
-	for {
-		select {
-		case msg := <-fs.transport.Consume():
-			fmt.Println(msg)
-		case _, ok := <-fs.quitCh:
-			if !ok {
-				return
-			}
-		}
-	}
 }
 
 func (fs *FileServer) bootstrapNetwork() error {
@@ -105,22 +85,86 @@ func (fs *FileServer) bootstrapNetwork() error {
 	return nil
 }
 
-func (fs *FileServer) Start() error {
-	defer func() {
-		fs.transport.Close()
-	}()
+func (fs *FileServer) StoreData(key string, r io.Reader) error {
+	buf := new(bytes.Buffer)
+	m := Message{
+		Payload: MessageStoreFile{
+			Key: key,
+		},
+	}
 
-	if err := fs.transport.ListenAndAccept(); err != nil {
+	if err := gob.NewEncoder(buf).Encode(m); err != nil {
 		return err
 	}
 
-	fs.bootstrapNetwork()
+	for _, peer := range fs.peers {
+		if err := peer.Send(buf.Bytes()); err != nil {
+			return err
 
-	fs.loop()
+		}
+	}
 
 	return nil
 }
 
-func (fs *FileServer) Stop() {
-	close(fs.quitCh)
+type Message struct {
+	Payload any
+}
+
+type MessageStoreFile struct {
+	Key string
+}
+
+func (fs *FileServer) broadcast(m *Message) error {
+	peers := []io.Writer{}
+
+	for _, peer := range fs.peers {
+		peers = append(peers, peer)
+	}
+
+	mw := io.MultiWriter(peers...)
+
+	return gob.NewEncoder(mw).Encode(m)
+}
+
+func (fs *FileServer) loop() {
+	defer fs.transport.Close()
+
+	for {
+		select {
+		case rpc := <-fs.transport.Consume():
+			log.Println("Received RPC:", rpc)
+			panic("aa")
+
+			var m Message
+
+			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&m); err != nil {
+				log.Println(err)
+				return
+			}
+
+			peer, ok := fs.peers[rpc.From]
+			if !ok {
+				panic("peer not found")
+			}
+
+			b := make([]byte, 1000)
+			if _, err := peer.Read(b); err != nil {
+				panic(err)
+			}
+
+			fmt.Printf("received: %s", string(b))
+
+			peer.(*p2p.TCPPeer).Wg.Done() // temporary
+
+		case _, ok := <-fs.quitCh:
+			if !ok {
+				return
+			}
+		}
+	}
+}
+
+func init() {
+	gob.Register(MessageStoreFile{})
 }
