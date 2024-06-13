@@ -114,6 +114,12 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 		return
 	}
 
+	if t.OnPeer != nil {
+		if err = t.OnPeer(peer); err != nil {
+			return
+		}
+	}
+
 	rpc := RPC{}
 	for {
 		err = t.Decoder.Decode(conn, &rpc)
@@ -123,7 +129,7 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 
 		rpc.From = conn.RemoteAddr().String()
 		peer.Wg.Add(1)
-		fmt.Println("waiting thill stream is done")
+		fmt.Println("waiting till stream is done")
 		t.rpcCh <- rpc
 
 		peer.Wg.Wait()

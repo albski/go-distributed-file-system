@@ -57,7 +57,7 @@ func main() {
 
 	data := bytes.NewReader([]byte("big data"))
 
-	fs2.StoreData("key", data)
+	fs2.StoreData("keykey", data)
 
 	select {}
 }

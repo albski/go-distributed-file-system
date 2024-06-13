@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 
 	"github.com/albski/go-distributed-file-system/p2p"
 )
@@ -98,9 +99,17 @@ func (fs *FileServer) StoreData(key string, r io.Reader) error {
 	}
 
 	for _, peer := range fs.peers {
+		fmt.Println(peer, m)
 		if err := peer.Send(buf.Bytes()); err != nil {
 			return err
+		}
+	}
 
+	time.Sleep(time.Second * 3)
+	payload := []byte("large file")
+	for _, peer := range fs.peers {
+		if err := peer.Send(payload); err != nil {
+			return err
 		}
 	}
 
@@ -133,15 +142,14 @@ func (fs *FileServer) loop() {
 	for {
 		select {
 		case rpc := <-fs.transport.Consume():
-			log.Println("Received RPC:", rpc)
-			panic("aa")
-
 			var m Message
 
 			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&m); err != nil {
 				log.Println(err)
 				return
 			}
+
+			fmt.Println("payload: ", m.Payload)
 
 			peer, ok := fs.peers[rpc.From]
 			if !ok {
@@ -153,7 +161,7 @@ func (fs *FileServer) loop() {
 				panic(err)
 			}
 
-			fmt.Printf("received: %s", string(b))
+			fmt.Printf("received: %s\n", string(b))
 
 			peer.(*p2p.TCPPeer).Wg.Done() // temporary
 
@@ -167,4 +175,5 @@ func (fs *FileServer) loop() {
 
 func init() {
 	gob.Register(MessageStoreFile{})
+	gob.Register(Message{})
 }
