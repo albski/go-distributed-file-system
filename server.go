@@ -72,9 +72,10 @@ func (fs *FileServer) OnPeer(p p2p.Peer) error {
 
 func (fs *FileServer) Get(key string) (io.Reader, error) {
 	if fs.storage.Has(key) {
+		fmt.Printf("%s serving file %s from local disk\n", fs.transport.Addr(), key)
 		return fs.storage.Read(key)
 	}
-	fmt.Printf("dont have file %s, fetching from the network\n", key)
+	fmt.Printf("%s dont have file %s, fetching from the network\n", fs.transport.Addr(), key)
 
 	m := Message{
 		Payload: MessageGetFile{
@@ -86,20 +87,20 @@ func (fs *FileServer) Get(key string) (io.Reader, error) {
 		return nil, err
 	}
 
+	time.Sleep(time.Millisecond * 500)
+
 	for _, peer := range fs.peers {
-		fmt.Println("receiveing stream from peer", peer.RemoteAddr())
-		fileBuffer := new(bytes.Buffer)
-		n, err := io.CopyN(fileBuffer, peer, 10)
+		n, err := fs.storage.Write(key, io.LimitReader(peer, 10))
 		if err != nil {
 			return nil, err
 		}
-		fmt.Println("received bytes over the network: ", n)
-		fmt.Println(fileBuffer.String())
+
+		fmt.Printf("%s received %d bytes over the network from %s\n", fs.transport.Addr(), n, peer.RemoteAddr())
+
+		peer.CloseStream()
 	}
 
-	select {}
-
-	return nil, nil
+	return fs.storage.Read(key)
 }
 
 func (fs *FileServer) Store(key string, r io.Reader) error {

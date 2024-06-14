@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -56,23 +56,19 @@ func main() {
 
 	time.Sleep(time.Second)
 
-	for i := 0; i < 10; i++ {
-		data := bytes.NewReader([]byte("1234567890"))
-		fs2.Store(fmt.Sprintf("key_%d", i), data)
-		time.Sleep(time.Millisecond * 10)
+	// data := bytes.NewReader([]byte("1234567890"))
+	// fs2.Store("cool.txt", data)
+	// time.Sleep(time.Millisecond * 10)
+
+	r, err := fs2.Get("cool.txt")
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// r, err := fs2.Get("keykey")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	b, err := io.ReadAll(r)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// b, err := io.ReadAll(r)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	// fmt.Println(string(b))
-
-	select {}
+	fmt.Println(string(b))
 }

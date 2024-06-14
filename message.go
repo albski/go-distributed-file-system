@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"log"
+
+	"github.com/albski/go-distributed-file-system/p2p"
 )
 
 type Message struct {
@@ -50,10 +52,10 @@ func (fs *FileServer) handleMessageStoreFile(from string, m MessageStoreFile) er
 
 func (fs *FileServer) handleMessageGetFile(from string, m MessageGetFile) error {
 	if !fs.storage.Has(m.Key) {
-		return fmt.Errorf("%s doesnt exist on disk", m.Key)
+		return fmt.Errorf("%s need to serve %s but it doesnt exist on disk", fs.transport.Addr(), m.Key)
 	}
 
-	fmt.Println("serving file: ", m.Key)
+	fmt.Printf("%s serving file %s", fs.transport.Addr(), m.Key)
 	r, err := fs.storage.Read(m.Key)
 	if err != nil {
 		return err
@@ -64,12 +66,14 @@ func (fs *FileServer) handleMessageGetFile(from string, m MessageGetFile) error 
 		return fmt.Errorf("peer %s not in map", from)
 	}
 
+	peer.Send([]byte{p2p.StreamRPC})
+
 	n, err := io.Copy(peer, r)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("written %d bytes over the network to %s\n", n, from)
+	fmt.Printf("%s written %d bytes over the network to %s\n", fs.transport.Addr(), n, from)
 
 	return nil
 }
