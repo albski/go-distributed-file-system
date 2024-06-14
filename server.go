@@ -70,6 +70,127 @@ func (fs *FileServer) OnPeer(p p2p.Peer) error {
 	return nil
 }
 
+func (fs *FileServer) Get(key string) (io.Reader, error) {
+	if fs.storage.Has(key) {
+		return fs.storage.Read(key)
+	}
+	fmt.Printf("dont have file %s, fetching from the network\n", key)
+
+	m := Message{
+		Payload: MessageGetFile{
+			Key: key,
+		},
+	}
+
+	if err := fs.broadcast(&m); err != nil {
+		return nil, err
+	}
+
+	for _, peer := range fs.peers {
+		fmt.Println("receiveing stream from peer", peer.RemoteAddr())
+		fileBuffer := new(bytes.Buffer)
+		n, err := io.CopyN(fileBuffer, peer, 10)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Println("received bytes over the network: ", n)
+		fmt.Println(fileBuffer.String())
+	}
+
+	select {}
+
+	return nil, nil
+}
+
+func (fs *FileServer) Store(key string, r io.Reader) error {
+	bufFile := new(bytes.Buffer)
+	tee := io.TeeReader(r, bufFile)
+
+	size, err := fs.storage.Write(key, tee)
+	if err != nil {
+		return err
+	}
+
+	m := Message{
+		Payload: MessageStoreFile{
+			Key:  key,
+			Size: size,
+		},
+	}
+
+	if err := fs.broadcast(&m); err != nil {
+		return err
+	}
+
+	time.Sleep(time.Second * 3)
+
+	for _, peer := range fs.peers {
+		n, err := io.Copy(peer, bufFile)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println("received and written bytes to disk:", n)
+	}
+
+	return nil
+}
+
+func (fs *FileServer) stream(m *Message) error {
+	peers := []io.Writer{}
+
+	for _, peer := range fs.peers {
+		peers = append(peers, peer)
+	}
+
+	mw := io.MultiWriter(peers...)
+
+	return gob.NewEncoder(mw).Encode(m)
+}
+
+func (fs *FileServer) broadcast(m *Message) error {
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(m); err != nil {
+		return err
+	}
+
+	for _, peer := range fs.peers {
+		if err := peer.Send(buf.Bytes()); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (fs *FileServer) loop() {
+	defer func() {
+		log.Println("file server stopped due to error or quit action")
+		fs.transport.Close()
+	}()
+
+	for {
+		select {
+		case rpc := <-fs.transport.Consume():
+			var m Message
+
+			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&m); err != nil {
+				log.Println("decoding error:", err)
+			}
+
+			if err := fs.handleMessage(rpc.From, &m); err != nil {
+				fmt.Println("handling message: ", m)
+				log.Println("handle message error", err)
+			}
+
+		case _, ok := <-fs.quitCh:
+			if !ok {
+				return
+			}
+		}
+	}
+}
+
 func (fs *FileServer) bootstrapNetwork() error {
 	for _, addr := range fs.bootstrapNodes {
 		if addr == "" {
@@ -86,94 +207,7 @@ func (fs *FileServer) bootstrapNetwork() error {
 	return nil
 }
 
-func (fs *FileServer) StoreData(key string, r io.Reader) error {
-	buf := new(bytes.Buffer)
-	m := Message{
-		Payload: MessageStoreFile{
-			Key: key,
-		},
-	}
-
-	if err := gob.NewEncoder(buf).Encode(m); err != nil {
-		return err
-	}
-
-	for _, peer := range fs.peers {
-		fmt.Println(peer, m)
-		if err := peer.Send(buf.Bytes()); err != nil {
-			return err
-		}
-	}
-
-	time.Sleep(time.Second * 3)
-	payload := []byte("large file")
-	for _, peer := range fs.peers {
-		if err := peer.Send(payload); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-type Message struct {
-	Payload any
-}
-
-type MessageStoreFile struct {
-	Key string
-}
-
-func (fs *FileServer) broadcast(m *Message) error {
-	peers := []io.Writer{}
-
-	for _, peer := range fs.peers {
-		peers = append(peers, peer)
-	}
-
-	mw := io.MultiWriter(peers...)
-
-	return gob.NewEncoder(mw).Encode(m)
-}
-
-func (fs *FileServer) loop() {
-	defer fs.transport.Close()
-
-	for {
-		select {
-		case rpc := <-fs.transport.Consume():
-			var m Message
-
-			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&m); err != nil {
-				log.Println(err)
-				return
-			}
-
-			fmt.Println("payload: ", m.Payload)
-
-			peer, ok := fs.peers[rpc.From]
-			if !ok {
-				panic("peer not found")
-			}
-
-			b := make([]byte, 1000)
-			if _, err := peer.Read(b); err != nil {
-				panic(err)
-			}
-
-			fmt.Printf("received: %s\n", string(b))
-
-			peer.(*p2p.TCPPeer).Wg.Done() // temporary
-
-		case _, ok := <-fs.quitCh:
-			if !ok {
-				return
-			}
-		}
-	}
-}
-
 func init() {
 	gob.Register(MessageStoreFile{})
-	gob.Register(Message{})
+	gob.Register(MessageGetFile{})
 }

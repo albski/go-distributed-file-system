@@ -93,7 +93,6 @@ func (t *TCPTransport) startAcceptLoop() {
 			fmt.Printf("TCP accept error %s\n", err)
 		}
 
-		fmt.Printf("incoming conn: %+v\n", conn.RemoteAddr())
 		go t.handleConn(conn, false)
 	}
 }

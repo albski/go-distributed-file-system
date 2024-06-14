@@ -38,7 +38,7 @@ func (s *Storage) Read(key string) (io.Reader, error) {
 	return buf, err
 }
 
-func (s *Storage) Write(key string, r io.Reader) error {
+func (s *Storage) Write(key string, r io.Reader) (size int64, err error) {
 	return s.writeStream(key, r)
 }
 
@@ -47,28 +47,26 @@ func (s *Storage) readStream(key string) (io.ReadCloser, error) {
 	return os.Open(keyPath.fullPath(s.rootDir))
 }
 
-func (s *Storage) writeStream(key string, r io.Reader) error {
+func (s *Storage) writeStream(key string, r io.Reader) (int64, error) {
 	keyPath := s.transformPathFunc(key)
 
 	if err := os.MkdirAll(keyPath.dirPath(s.rootDir), os.ModePerm); err != nil {
-		return err
+		return 0, err
 	}
 
 	fullPath := keyPath.fullPath(s.rootDir)
 
 	f, err := os.Create(fullPath)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	n, err := io.Copy(f, r)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	log.Printf("written %d bytes to disk: %s", n, fullPath)
-
-	return nil
+	return n, nil
 }
 
 func (s *Storage) Has(key string) bool {

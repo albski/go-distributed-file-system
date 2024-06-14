@@ -16,7 +16,7 @@ func TestStorage(t *testing.T) {
 	key := "random key"
 	data := []byte("some jpg data")
 
-	if err := s.writeStream(key, bytes.NewReader(data)); err != nil {
+	if _, err := s.writeStream(key, bytes.NewReader(data)); err != nil {
 		t.Error(err)
 	}
 
