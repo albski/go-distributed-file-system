@@ -7,12 +7,14 @@ type Peer interface {
 	net.Conn
 
 	Send([]byte) error
+	CloseStream()
 }
 
 // anything that handles communication
 // between nodes in the network
 // e.g. TCP or UDP or websockets
 type Transport interface {
+	Addr() string
 	Dial(string) error
 	ListenAndAccept() error
 	Consume() <-chan RPC

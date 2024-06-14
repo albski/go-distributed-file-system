@@ -14,20 +14,24 @@ type TCPPeer struct {
 	// accept and retrieve => outbound = false
 	outbound bool
 
-	Wg *sync.WaitGroup
+	wg *sync.WaitGroup
 }
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		Conn:     conn,
 		outbound: outbound,
-		Wg:       &sync.WaitGroup{},
+		wg:       &sync.WaitGroup{},
 	}
 }
 
 func (p *TCPPeer) Send(b []byte) error {
 	_, err := p.Conn.Write(b)
 	return err
+}
+
+func (p *TCPPeer) CloseStream() {
+	p.wg.Done()
 }
 
 type TCPTransportOpts struct {
@@ -46,8 +50,12 @@ type TCPTransport struct {
 func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportOpts: opts,
-		rpcCh:            make(chan RPC),
+		rpcCh:            make(chan RPC, 1024),
 	}
+}
+
+func (t *TCPTransport) Addr() string {
+	return t.ListenAddr
 }
 
 func (t *TCPTransport) Dial(addr string) error {
@@ -119,19 +127,24 @@ func (t *TCPTransport) handleConn(conn net.Conn, outbound bool) {
 		}
 	}
 
-	rpc := RPC{}
 	for {
+		rpc := RPC{}
+
 		err = t.Decoder.Decode(conn, &rpc)
 		if err != nil {
 			return
 		}
 
 		rpc.From = conn.RemoteAddr().String()
-		peer.Wg.Add(1)
-		fmt.Println("waiting till stream is done")
-		t.rpcCh <- rpc
 
-		peer.Wg.Wait()
-		fmt.Println("stream done")
+		if rpc.Stream {
+			peer.wg.Add(1)
+			fmt.Println(conn.RemoteAddr(), " incoming stream, waiting...")
+			peer.wg.Wait()
+			fmt.Println(conn.RemoteAddr(), " stream closed, resuming tcp loop")
+			continue
+		}
+
+		t.rpcCh <- rpc
 	}
 }

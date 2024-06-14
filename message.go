@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-
-	"github.com/albski/go-distributed-file-system/p2p"
 )
 
 type Message struct {
@@ -43,9 +41,9 @@ func (fs *FileServer) handleMessageStoreFile(from string, m MessageStoreFile) er
 		return err
 	}
 
-	log.Printf("written %d bytes to disk\n", n)
+	log.Printf("%s written %d bytes to disk\n", fs.transport.Addr(), n)
 
-	peer.(*p2p.TCPPeer).Wg.Done()
+	peer.CloseStream()
 
 	return nil
 }

@@ -122,9 +122,10 @@ func (fs *FileServer) Store(key string, r io.Reader) error {
 		return err
 	}
 
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Millisecond * 10)
 
 	for _, peer := range fs.peers {
+		peer.Send([]byte{p2p.StreamRPC})
 		n, err := io.Copy(peer, bufFile)
 		if err != nil {
 			return err
@@ -155,6 +156,8 @@ func (fs *FileServer) broadcast(m *Message) error {
 	}
 
 	for _, peer := range fs.peers {
+		peer.Send([]byte{p2p.MessageRPC})
+
 		if err := peer.Send(buf.Bytes()); err != nil {
 			return err
 		}
