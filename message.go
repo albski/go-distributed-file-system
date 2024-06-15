@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
@@ -55,10 +56,16 @@ func (fs *FileServer) handleMessageGetFile(from string, m MessageGetFile) error 
 		return fmt.Errorf("%s need to serve %s but it doesnt exist on disk", fs.transport.Addr(), m.Key)
 	}
 
-	fmt.Printf("%s serving file %s", fs.transport.Addr(), m.Key)
-	r, err := fs.storage.Read(m.Key)
+	fmt.Printf("%s serving file %s\n", fs.transport.Addr(), m.Key)
+	fileSize, r, err := fs.storage.Read(m.Key)
 	if err != nil {
 		return err
+	}
+
+	rc, ok := r.(io.ReadCloser)
+	if ok {
+		fmt.Println("closing ReadCloser")
+		defer rc.Close()
 	}
 
 	peer, ok := fs.peers[from]
@@ -67,6 +74,7 @@ func (fs *FileServer) handleMessageGetFile(from string, m MessageGetFile) error 
 	}
 
 	peer.Send([]byte{p2p.StreamRPC})
+	binary.Write(peer, binary.LittleEndian, fileSize)
 
 	n, err := io.Copy(peer, r)
 	if err != nil {

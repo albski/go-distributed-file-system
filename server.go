@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	"io"
@@ -73,8 +74,11 @@ func (fs *FileServer) OnPeer(p p2p.Peer) error {
 func (fs *FileServer) Get(key string) (io.Reader, error) {
 	if fs.storage.Has(key) {
 		fmt.Printf("%s serving file %s from local disk\n", fs.transport.Addr(), key)
-		return fs.storage.Read(key)
+
+		_, r, err := fs.storage.Read(key)
+		return r, err
 	}
+
 	fmt.Printf("%s dont have file %s, fetching from the network\n", fs.transport.Addr(), key)
 
 	m := Message{
@@ -90,7 +94,10 @@ func (fs *FileServer) Get(key string) (io.Reader, error) {
 	time.Sleep(time.Millisecond * 500)
 
 	for _, peer := range fs.peers {
-		n, err := fs.storage.Write(key, io.LimitReader(peer, 10))
+		var fileSize int64
+		binary.Read(peer, binary.LittleEndian, &fileSize)
+
+		n, err := fs.storage.Write(key, io.LimitReader(peer, fileSize))
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +107,8 @@ func (fs *FileServer) Get(key string) (io.Reader, error) {
 		peer.CloseStream()
 	}
 
-	return fs.storage.Read(key)
+	_, r, err := fs.storage.Read(key)
+	return r, err
 }
 
 func (fs *FileServer) Store(key string, r io.Reader) error {
@@ -136,18 +144,6 @@ func (fs *FileServer) Store(key string, r io.Reader) error {
 	}
 
 	return nil
-}
-
-func (fs *FileServer) stream(m *Message) error {
-	peers := []io.Writer{}
-
-	for _, peer := range fs.peers {
-		peers = append(peers, peer)
-	}
-
-	mw := io.MultiWriter(peers...)
-
-	return gob.NewEncoder(mw).Encode(m)
 }
 
 func (fs *FileServer) broadcast(m *Message) error {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"io"
 	"log"
@@ -25,26 +24,28 @@ func NewStorage(opts StorageOpts) *Storage {
 	return &Storage{StorageOpts: opts}
 }
 
-func (s *Storage) Read(key string) (io.Reader, error) {
-	f, err := s.readStream(key)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	buf := new(bytes.Buffer)
-	_, err = io.Copy(buf, f)
-
-	return buf, err
+func (s *Storage) Read(key string) (int64, io.Reader, error) {
+	return s.readStream(key)
 }
 
 func (s *Storage) Write(key string, r io.Reader) (size int64, err error) {
 	return s.writeStream(key, r)
 }
 
-func (s *Storage) readStream(key string) (io.ReadCloser, error) {
+func (s *Storage) readStream(key string) (int64, io.ReadCloser, error) {
 	keyPath := s.transformPathFunc(key)
-	return os.Open(keyPath.fullPath(s.rootDir))
+
+	f, err := os.Open(keyPath.fullPath(s.rootDir))
+	if err != nil {
+		return 0, nil, err
+	}
+
+	fi, err := f.Stat()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return fi.Size(), f, nil
 }
 
 func (s *Storage) writeStream(key string, r io.Reader) (int64, error) {

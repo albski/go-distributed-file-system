@@ -22,7 +22,7 @@ func TestStorage(t *testing.T) {
 
 	assert.True(t, s.Has(key))
 
-	r, err := s.Read(key)
+	_, r, err := s.Read(key)
 	if err != nil {
 		t.Error(err)
 	}
