@@ -38,7 +38,7 @@ func (k KeyPath) joinPaths(basePath string, paths ...string) string {
 
 type transformPathFunc func(string) KeyPath
 
-func transformPathCrypt(key string) KeyPath {
+func transformPathCrypto(key string) KeyPath {
 	hash := sha1.Sum([]byte(key))
 	hashStr := hex.EncodeToString(hash[:])
 

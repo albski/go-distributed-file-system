@@ -20,7 +20,7 @@ func makeServer(listenAddr string, nodes ...string) *FileServer {
 
 	fileServerOpts := FileServerOpts{
 		storageRoot:       listenAddr + "_network",
-		transformPathFunc: transformPathCrypt,
+		transformPathFunc: transformPathCrypto,
 		transport:         tcpTransport,
 		bootstrapNodes:    nodes,
 	}

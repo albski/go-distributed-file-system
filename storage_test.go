@@ -40,7 +40,7 @@ func TestStorage(t *testing.T) {
 
 func TestCryptPathTransformFunc(t *testing.T) {
 	key := "randomKey"
-	keyPath := transformPathCrypt(key)
+	keyPath := transformPathCrypto(key)
 
 	expectedKey := `1d7dbdcda1992ee24e7232d2fcbe8d49f28ca22c`
 	expectedPath := `1d7db/dcda1/992ee/24e72/32d2f/cbe8d/49f28/ca22c`
@@ -51,7 +51,7 @@ func TestCryptPathTransformFunc(t *testing.T) {
 
 func newStorage() *Storage {
 	opts := StorageOpts{
-		transformPathFunc: transformPathCrypt,
+		transformPathFunc: transformPathCrypto,
 	}
 
 	return NewStorage(opts)
