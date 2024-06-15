@@ -19,10 +19,12 @@ func TestCopyEncryptDecrypt(t *testing.T) {
 	}
 
 	out := new(bytes.Buffer)
-	_, err = copyDecrypt(key, dst, out)
+	nw, err := copyDecrypt(key, dst, out)
 	if err != nil {
 		t.Error(err)
 	}
+
+	assert.Equal(t, len(payload)+16, nw)
 
 	assert.Equal(t, payload, out.String())
 }
