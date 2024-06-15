@@ -98,7 +98,7 @@ func (fs *FileServer) Get(key string) (io.Reader, error) {
 		var fileSize int64
 		binary.Read(peer, binary.LittleEndian, &fileSize)
 
-		n, err := fs.storage.Write(key, io.LimitReader(peer, fileSize))
+		n, err := fs.storage.WriteDecrypt(fs.encryptionKey, key, io.LimitReader(peer, fileSize))
 		if err != nil {
 			return nil, err
 		}
@@ -134,21 +134,18 @@ func (fs *FileServer) Store(key string, r io.Reader) error {
 
 	time.Sleep(time.Millisecond * 10)
 
-	// TODO: multiwriter
+	peers := []io.Writer{}
 	for _, peer := range fs.peers {
-		peer.Send([]byte{p2p.StreamRPC})
-
-		n, err := copyEncrypt(fs.encryptionKey, bufFile, peer)
-		if err != nil {
-			return err
-		}
-		// n, err := io.Copy(peer, bufFile)
-		// if err != nil {
-		// 	return err
-		// }
-
-		fmt.Println("received and written bytes to disk:", n)
+		peers = append(peers, peer)
 	}
+	mw := io.MultiWriter(peers...)
+	mw.Write([]byte{p2p.StreamRPC})
+	n, err := copyEncrypt(fs.encryptionKey, bufFile, mw)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("received and written bytes to disk:", n)
 
 	return nil
 }

@@ -28,46 +28,14 @@ func (s *Storage) Read(key string) (int64, io.Reader, error) {
 	return s.readStream(key)
 }
 
-func (s *Storage) Write(key string, r io.Reader) (size int64, err error) {
-	return s.writeStream(key, r)
-}
-
-func (s *Storage) readStream(key string) (int64, io.ReadCloser, error) {
-	keyPath := s.transformPathFunc(key)
-
-	f, err := os.Open(keyPath.fullPath(s.rootDir))
-	if err != nil {
-		return 0, nil, err
-	}
-
-	fi, err := f.Stat()
-	if err != nil {
-		return 0, nil, err
-	}
-
-	return fi.Size(), f, nil
-}
-
-func (s *Storage) writeStream(key string, r io.Reader) (int64, error) {
-	keyPath := s.transformPathFunc(key)
-
-	if err := os.MkdirAll(keyPath.dirPath(s.rootDir), os.ModePerm); err != nil {
-		return 0, err
-	}
-
-	fullPath := keyPath.fullPath(s.rootDir)
-
-	f, err := os.Create(fullPath)
+func (s *Storage) WriteDecrypt(encryptionKey []byte, key string, r io.Reader) (int64, error) {
+	f, err := s.fileWrite(key)
 	if err != nil {
 		return 0, err
 	}
 
-	n, err := io.Copy(f, r)
-	if err != nil {
-		return 0, err
-	}
-
-	return n, nil
+	n, err := copyDecrypt(encryptionKey, r, f)
+	return int64(n), err
 }
 
 func (s *Storage) Has(key string) bool {
@@ -90,4 +58,43 @@ func (s *Storage) Delete(key string) error {
 
 func (s *Storage) Clear() error {
 	return os.RemoveAll(s.rootDir)
+}
+
+func (s *Storage) Write(key string, r io.Reader) (size int64, err error) {
+	return s.writeStream(key, r)
+}
+
+func (s *Storage) readStream(key string) (int64, io.ReadCloser, error) {
+	keyPath := s.transformPathFunc(key)
+
+	f, err := os.Open(keyPath.fullPath(s.rootDir))
+	if err != nil {
+		return 0, nil, err
+	}
+
+	fi, err := f.Stat()
+	if err != nil {
+		return 0, nil, err
+	}
+
+	return fi.Size(), f, nil
+}
+
+func (s *Storage) fileWrite(key string) (*os.File, error) {
+	keyPath := s.transformPathFunc(key)
+
+	if err := os.MkdirAll(keyPath.dirPath(s.rootDir), os.ModePerm); err != nil {
+		return nil, err
+	}
+
+	return os.Create(keyPath.fullPath(s.rootDir))
+}
+
+func (s *Storage) writeStream(key string, r io.Reader) (int64, error) {
+	f, err := s.fileWrite(key)
+	if err != nil {
+		return 0, err
+	}
+
+	return io.Copy(f, r)
 }

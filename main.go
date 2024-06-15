@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"log"
 	"time"
 
@@ -56,18 +58,23 @@ func main() {
 
 	time.Sleep(time.Second)
 
+	key := "cool.txt"
 	data := bytes.NewReader([]byte("1234567890"))
-	fs2.Store("cool.txt", data)
+	fs2.Store(key, data)
 
-	// r, err := fs2.Get("cool.txt")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	if err := fs2.storage.Delete(key); err != nil {
+		log.Fatal(err)
+	}
 
-	// b, err := io.ReadAll(r)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	r, err := fs2.Get(key)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// fmt.Println(string(b))
+	b, err := io.ReadAll(r)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(string(b))
 }
