@@ -32,7 +32,7 @@ func (d DefaultDecoder) Decode(r io.Reader, rpc *RPC) error {
 	buf := make([]byte, 1024)
 	n, err := r.Read(buf)
 	if err != nil {
-		return err // temp
+		return err
 	}
 
 	rpc.Payload = buf[:n]
