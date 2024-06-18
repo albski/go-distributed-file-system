@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 )
 
 type StorageOpts struct {
@@ -24,12 +25,40 @@ func NewStorage(opts StorageOpts) *Storage {
 	return &Storage{StorageOpts: opts}
 }
 
-func (s *Storage) Read(key string) (int64, io.Reader, error) {
-	return s.readStream(key)
+func (s *Storage) Read(id, key string) (int64, io.Reader, error) {
+	return s.readStream(id, key)
 }
 
-func (s *Storage) WriteDecrypt(encryptionKey []byte, key string, r io.Reader) (int64, error) {
-	f, err := s.fileWrite(key)
+func (s *Storage) Has(id, key string) bool {
+	keyPath := s.transformPathFunc(key)
+	basePath := filepath.Join(s.rootDir, id)
+
+	_, err := os.Stat(keyPath.fullPath(basePath))
+
+	return !errors.Is(err, os.ErrNotExist)
+}
+
+func (s *Storage) Delete(id, key string) error {
+	keyPath := s.transformPathFunc(key)
+	basePath := filepath.Join(s.rootDir, id)
+
+	defer func() {
+		log.Printf("deleted %s", keyPath.Key)
+	}()
+
+	return os.RemoveAll(keyPath.rootPath(basePath))
+}
+
+func (s *Storage) Clear() error {
+	return os.RemoveAll(s.rootDir)
+}
+
+func (s *Storage) Write(id, key string, r io.Reader) (size int64, err error) {
+	return s.writeStream(id, key, r)
+}
+
+func (s *Storage) WriteDecrypt(encryptionKey []byte, id, key string, r io.Reader) (int64, error) {
+	f, err := s.fileWrite(id, key)
 	if err != nil {
 		return 0, err
 	}
@@ -38,36 +67,11 @@ func (s *Storage) WriteDecrypt(encryptionKey []byte, key string, r io.Reader) (i
 	return int64(n), err
 }
 
-func (s *Storage) Has(key string) bool {
+func (s *Storage) readStream(id, key string) (int64, io.ReadCloser, error) {
 	keyPath := s.transformPathFunc(key)
+	basePath := filepath.Join(s.rootDir, id)
 
-	_, err := os.Stat(keyPath.fullPath(s.rootDir))
-
-	return !errors.Is(err, os.ErrNotExist)
-}
-
-func (s *Storage) Delete(key string) error {
-	keyPath := s.transformPathFunc(key)
-
-	defer func() {
-		log.Printf("deleted %s", keyPath.Key)
-	}()
-
-	return os.RemoveAll(keyPath.rootPath(s.rootDir))
-}
-
-func (s *Storage) Clear() error {
-	return os.RemoveAll(s.rootDir)
-}
-
-func (s *Storage) Write(key string, r io.Reader) (size int64, err error) {
-	return s.writeStream(key, r)
-}
-
-func (s *Storage) readStream(key string) (int64, io.ReadCloser, error) {
-	keyPath := s.transformPathFunc(key)
-
-	f, err := os.Open(keyPath.fullPath(s.rootDir))
+	f, err := os.Open(keyPath.fullPath(basePath))
 	if err != nil {
 		return 0, nil, err
 	}
@@ -80,18 +84,19 @@ func (s *Storage) readStream(key string) (int64, io.ReadCloser, error) {
 	return fi.Size(), f, nil
 }
 
-func (s *Storage) fileWrite(key string) (*os.File, error) {
+func (s *Storage) fileWrite(id, key string) (*os.File, error) {
 	keyPath := s.transformPathFunc(key)
+	basePath := filepath.Join(s.rootDir, id)
 
-	if err := os.MkdirAll(keyPath.dirPath(s.rootDir), os.ModePerm); err != nil {
+	if err := os.MkdirAll(keyPath.dirPath(basePath), os.ModePerm); err != nil {
 		return nil, err
 	}
 
-	return os.Create(keyPath.fullPath(s.rootDir))
+	return os.Create(keyPath.fullPath(basePath))
 }
 
-func (s *Storage) writeStream(key string, r io.Reader) (int64, error) {
-	f, err := s.fileWrite(key)
+func (s *Storage) writeStream(id, key string, r io.Reader) (int64, error) {
+	f, err := s.fileWrite(id, key)
 	if err != nil {
 		return 0, err
 	}

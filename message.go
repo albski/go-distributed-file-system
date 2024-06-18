@@ -14,11 +14,13 @@ type Message struct {
 }
 
 type MessageStoreFile struct {
+	ID   string
 	Key  string
 	Size int64
 }
 
 type MessageGetFile struct {
+	ID  string
 	Key string
 }
 
@@ -39,7 +41,7 @@ func (fs *FileServer) handleMessageStoreFile(from string, m MessageStoreFile) er
 		return fmt.Errorf("peer (%s) could not be founc in the peer list", from)
 	}
 
-	n, err := fs.storage.Write(m.Key, io.LimitReader(peer, m.Size))
+	n, err := fs.storage.Write(fs.id, m.Key, io.LimitReader(peer, m.Size))
 	if err != nil {
 		return err
 	}
@@ -52,12 +54,12 @@ func (fs *FileServer) handleMessageStoreFile(from string, m MessageStoreFile) er
 }
 
 func (fs *FileServer) handleMessageGetFile(from string, m MessageGetFile) error {
-	if !fs.storage.Has(m.Key) {
+	if !fs.storage.Has(fs.id, m.Key) {
 		return fmt.Errorf("%s need to serve %s but it doesnt exist on disk", fs.transport.Addr(), m.Key)
 	}
 
 	fmt.Printf("%s serving file %s\n", fs.transport.Addr(), m.Key)
-	fileSize, r, err := fs.storage.Read(m.Key)
+	fileSize, r, err := fs.storage.Read(fs.id, m.Key)
 	if err != nil {
 		return err
 	}

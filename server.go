@@ -14,6 +14,7 @@ import (
 )
 
 type FileServerOpts struct {
+	id                string
 	encryptionKey     []byte
 	storageRoot       string
 	transformPathFunc transformPathFunc
@@ -38,6 +39,10 @@ func NewFileServer(opts FileServerOpts) *FileServer {
 		transformPathFunc: opts.transformPathFunc,
 	}
 
+	if opts.id == "" {
+		opts.id = generateId()
+	}
+
 	return &FileServer{
 		FileServerOpts: opts,
 		storage:        NewStorage(storageOpts),
@@ -47,6 +52,8 @@ func NewFileServer(opts FileServerOpts) *FileServer {
 }
 
 func (fs *FileServer) Start() error {
+	fmt.Printf("%s starting file server\n", fs.transport.Addr())
+
 	if err := fs.transport.ListenAndAccept(); err != nil {
 		return err
 	}
@@ -73,10 +80,10 @@ func (fs *FileServer) OnPeer(p p2p.Peer) error {
 }
 
 func (fs *FileServer) Get(key string) (io.Reader, error) {
-	if fs.storage.Has(key) {
+	if fs.storage.Has(fs.id, key) {
 		fmt.Printf("%s serving file %s from local disk\n", fs.transport.Addr(), key)
 
-		_, r, err := fs.storage.Read(key)
+		_, r, err := fs.storage.Read(fs.id, key)
 		return r, err
 	}
 
@@ -84,6 +91,7 @@ func (fs *FileServer) Get(key string) (io.Reader, error) {
 
 	m := Message{
 		Payload: MessageGetFile{
+			ID:  fs.id,
 			Key: key,
 		},
 	}
@@ -98,7 +106,7 @@ func (fs *FileServer) Get(key string) (io.Reader, error) {
 		var fileSize int64
 		binary.Read(peer, binary.LittleEndian, &fileSize)
 
-		n, err := fs.storage.WriteDecrypt(fs.encryptionKey, key, io.LimitReader(peer, fileSize))
+		n, err := fs.storage.WriteDecrypt(fs.encryptionKey, fs.id, key, io.LimitReader(peer, fileSize))
 		if err != nil {
 			return nil, err
 		}
@@ -108,21 +116,22 @@ func (fs *FileServer) Get(key string) (io.Reader, error) {
 		peer.CloseStream()
 	}
 
-	_, r, err := fs.storage.Read(key)
+	_, r, err := fs.storage.Read(fs.id, key)
 	return r, err
 }
 
 func (fs *FileServer) Store(key string, r io.Reader) error {
-	bufFile := new(bytes.Buffer)
-	tee := io.TeeReader(r, bufFile)
+	fileBuf := new(bytes.Buffer)
+	tee := io.TeeReader(r, fileBuf)
 
-	size, err := fs.storage.Write(key, tee)
+	size, err := fs.storage.Write(fs.id, key, tee)
 	if err != nil {
 		return err
 	}
 
 	m := Message{
 		Payload: MessageStoreFile{
+			ID:   fs.id,
 			Key:  key,
 			Size: size + 16, // size + BlockSize()
 		},
@@ -140,7 +149,7 @@ func (fs *FileServer) Store(key string, r io.Reader) error {
 	}
 	mw := io.MultiWriter(peers...)
 	mw.Write([]byte{p2p.StreamRPC})
-	n, err := copyEncrypt(fs.encryptionKey, bufFile, mw)
+	n, err := copyEncrypt(fs.encryptionKey, fileBuf, mw)
 	if err != nil {
 		return err
 	}
@@ -183,14 +192,11 @@ func (fs *FileServer) loop() {
 			}
 
 			if err := fs.handleMessage(rpc.From, &m); err != nil {
-				fmt.Println("handling message: ", m)
 				log.Println("handle message error", err)
 			}
 
-		case _, ok := <-fs.quitCh:
-			if !ok {
-				return
-			}
+		case <-fs.quitCh:
+			return
 		}
 	}
 }
@@ -202,6 +208,7 @@ func (fs *FileServer) bootstrapNetwork() error {
 		}
 
 		go func(addr string) {
+			fmt.Printf("%s attempting to connect to %s\n", fs.transport.Addr(), addr)
 			if err := fs.transport.Dial(addr); err != nil {
 				log.Println("dial error: ", err)
 			}

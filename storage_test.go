@@ -11,18 +11,20 @@ import (
 
 func TestStorage(t *testing.T) {
 	s := newStorage()
+	id := generateId()
+
 	defer teardown(t, s)
 
 	key := "random key"
 	data := []byte("some jpg data")
 
-	if _, err := s.writeStream(key, bytes.NewReader(data)); err != nil {
+	if _, err := s.Write(id, key, bytes.NewReader(data)); err != nil {
 		t.Error(err)
 	}
 
-	assert.True(t, s.Has(key))
+	assert.True(t, s.Has(id, key))
 
-	_, r, err := s.Read(key)
+	_, r, err := s.Read(id, key)
 	if err != nil {
 		t.Error(err)
 	}
@@ -33,9 +35,9 @@ func TestStorage(t *testing.T) {
 
 	assert.Equal(t, string(b), string(data))
 
-	s.Delete(key)
+	s.Delete(id, key)
 
-	assert.False(t, s.Has(key))
+	assert.False(t, s.Has(id, key))
 }
 
 func TestCryptPathTransformFunc(t *testing.T) {

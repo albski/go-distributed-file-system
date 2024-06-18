@@ -37,6 +37,7 @@ func makeServer(listenAddr string, nodes ...string) *FileServer {
 func main() {
 	fs1 := makeServer(":3000", "")
 	fs2 := makeServer(":4000", ":3000")
+	fs3 := makeServer(":7000", ":3000", ":4000")
 
 	time.Sleep(time.Second)
 
@@ -56,25 +57,36 @@ func main() {
 		}
 	}()
 
+	time.Sleep(time.Second * 4)
+
+	go func() {
+		err := fs3.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
 	time.Sleep(time.Second)
 
-	key := "cool.txt"
-	data := bytes.NewReader([]byte("1234567890"))
-	fs2.Store(key, data)
+	for i := 0; i < 20; i++ {
+		key := fmt.Sprintf("cool_%d.txt", i)
+		data := bytes.NewReader([]byte("1234567890"))
+		fs3.Store(key, data)
 
-	if err := fs2.storage.Delete(key); err != nil {
-		log.Fatal(err)
+		if err := fs3.storage.Delete(fs3.id, key); err != nil {
+			log.Fatal(err)
+		}
+
+		r, err := fs3.Get(key)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		b, err := io.ReadAll(r)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println(string(b))
 	}
-
-	r, err := fs2.Get(key)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	b, err := io.ReadAll(r)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(string(b))
 }
