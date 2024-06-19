@@ -11,7 +11,7 @@ const defaultRootDir = "network"
 
 type KeyPath struct {
 	Key  string
-	Path string // Path is based on Key
+	Path string
 }
 
 func (k KeyPath) dirPath(basePath string) string {

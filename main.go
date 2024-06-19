@@ -36,10 +36,8 @@ func makeServer(listenAddr string, nodes ...string) *FileServer {
 
 func main() {
 	fs1 := makeServer(":3000", "")
-	fs2 := makeServer(":4000", ":3000")
-	fs3 := makeServer(":7000", ":3000", ":4000")
-
-	time.Sleep(time.Second)
+	fs2 := makeServer(":3001", "")
+	fs3 := makeServer(":3002", ":3000", ":3001")
 
 	go func() {
 		err := fs1.Start()
@@ -57,7 +55,7 @@ func main() {
 		}
 	}()
 
-	time.Sleep(time.Second * 4)
+	time.Sleep(time.Second * 2)
 
 	go func() {
 		err := fs3.Start()
@@ -66,7 +64,7 @@ func main() {
 		}
 	}()
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 2)
 
 	for i := 0; i < 20; i++ {
 		key := fmt.Sprintf("cool_%d.txt", i)

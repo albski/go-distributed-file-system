@@ -2,7 +2,6 @@ package p2p
 
 import "net"
 
-// remote node
 type Peer interface {
 	net.Conn
 
@@ -10,9 +9,6 @@ type Peer interface {
 	CloseStream()
 }
 
-// anything that handles communication
-// between nodes in the network
-// e.g. TCP or UDP or websockets
 type Transport interface {
 	Addr() string
 	Dial(string) error
