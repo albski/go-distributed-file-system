@@ -92,7 +92,7 @@ func (fs *FileServer) Get(key string) (io.Reader, error) {
 	m := Message{
 		Payload: MessageGetFile{
 			ID:  fs.id,
-			Key: key,
+			Key: hashKey(key),
 		},
 	}
 
@@ -132,7 +132,7 @@ func (fs *FileServer) Store(key string, r io.Reader) error {
 	m := Message{
 		Payload: MessageStoreFile{
 			ID:   fs.id,
-			Key:  key,
+			Key:  hashKey(key),
 			Size: size + 16, // size + BlockSize()
 		},
 	}
