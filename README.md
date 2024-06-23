@@ -1,5 +1,3 @@
-### Distributed File System in Go
-
 #### Hi there! 👋
 
 This project aims to make a peer-to-peer file system in Go capable of handling and streaming large files efficiently.
