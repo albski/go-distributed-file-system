@@ -79,6 +79,29 @@ func (fs *FileServer) OnPeer(p p2p.Peer) error {
 	return nil
 }
 
+func (fs *FileServer) Delete(key string) error {
+	if !fs.storage.Has(fs.id, key) {
+		return fmt.Errorf("%s key not in storage: %v", key, fs.transport.Addr())
+	}
+
+	m := Message{
+		Payload: MessageDeleteFile{
+			ID:  fs.id,
+			Key: hashKey(key),
+		},
+	}
+
+	if err := fs.broadcast(&m); err != nil {
+		return err
+	}
+
+	if err := fs.storage.Delete(fs.id, key); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (fs *FileServer) Get(key string) (io.Reader, error) {
 	if fs.storage.Has(fs.id, key) {
 		fmt.Printf("%s serving file %s from local disk\n", fs.transport.Addr(), key)
@@ -99,8 +122,6 @@ func (fs *FileServer) Get(key string) (io.Reader, error) {
 	if err := fs.broadcast(&m); err != nil {
 		return nil, err
 	}
-
-	time.Sleep(time.Millisecond * 500)
 
 	for _, peer := range fs.peers {
 		var fileSize int64
@@ -141,7 +162,7 @@ func (fs *FileServer) Store(key string, r io.Reader) error {
 		return err
 	}
 
-	time.Sleep(time.Millisecond * 10)
+	time.Sleep(time.Millisecond) // store in peers doesnt work without this line
 
 	peers := []io.Writer{}
 	for _, peer := range fs.peers {
@@ -221,4 +242,5 @@ func (fs *FileServer) bootstrapNetwork() error {
 func init() {
 	gob.Register(MessageStoreFile{})
 	gob.Register(MessageGetFile{})
+	gob.Register(MessageDeleteFile{})
 }

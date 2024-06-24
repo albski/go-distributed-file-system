@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"time"
 
@@ -55,7 +54,7 @@ func main() {
 		}
 	}()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second)
 
 	go func() {
 		err := fs3.Start()
@@ -64,27 +63,29 @@ func main() {
 		}
 	}()
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Second)
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 1; i++ {
 		key := fmt.Sprintf("cool_%d.txt", i)
 		data := bytes.NewReader([]byte("1234567890"))
 		fs3.Store(key, data)
 
-		if err := fs3.storage.Delete(fs3.id, key); err != nil {
+		time.Sleep(time.Second)
+
+		if err := fs3.Delete(key); err != nil {
 			log.Fatal(err)
 		}
 
-		r, err := fs3.Get(key)
-		if err != nil {
-			log.Fatal(err)
-		}
+		// r, err := fs3.Get(key)
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
 
-		b, err := io.ReadAll(r)
-		if err != nil {
-			log.Fatal(err)
-		}
+		// b, err := io.ReadAll(r)
+		// if err != nil {
+		// 	log.Fatal(err)
+		// }
 
-		fmt.Println(string(b))
+		// fmt.Println(string(b))
 	}
 }

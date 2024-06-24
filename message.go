@@ -24,12 +24,35 @@ type MessageGetFile struct {
 	Key string
 }
 
+type MessageDeleteFile struct {
+	ID  string
+	Key string
+}
+
 func (fs *FileServer) handleMessage(from string, m *Message) error {
 	switch v := m.Payload.(type) {
 	case MessageStoreFile:
 		return fs.handleMessageStoreFile(from, v)
 	case MessageGetFile:
 		return fs.handleMessageGetFile(from, v)
+	case MessageDeleteFile:
+		return fs.handleMessageDeleteFile(from, v)
+	}
+
+	return nil
+}
+
+func (fs *FileServer) handleMessageDeleteFile(from string, m MessageDeleteFile) error {
+	if !fs.storage.Has(fs.id, m.Key) {
+		return fmt.Errorf("%s need to serve %s but it doesnt exist on disk", fs.transport.Addr(), m.Key)
+	}
+
+	if _, ok := fs.peers[from]; !ok {
+		return fmt.Errorf("peer %s not in map", from)
+	}
+
+	if err := fs.storage.Delete(fs.id, m.Key); err != nil {
+		return fmt.Errorf("couldnt delete %s: %w", m.Key, err)
 	}
 
 	return nil

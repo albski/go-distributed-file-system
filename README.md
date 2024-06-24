@@ -3,7 +3,7 @@
 This project aims to make a peer-to-peer file system in Go capable of handling and streaming large files efficiently.
 
 The work is in progress and the TODO list is as follows:
-- [ ] delete in peers
+- [x] delete in peers
 - [ ] file server api (remote wget)
 - [ ] refactor for docker compose
 - [ ] docker compose setup
